@@ -1,0 +1,20 @@
+/*
+ * Style sheet for the Gallery.
+ */
+.thumbrun li {
+    display: inline-block;
+    list-style-type: none;
+    text-align: center;
+    background: #eee;
+    padding: 10px;
+    margin: 15px;
+    -moz-box-shadow:    10px 10px 5px #666;
+    -webkit-box-shadow: 10px 10px 5px #666;
+    box-shadow:         10px 10px 5px #666;
+}
+.thumbrun .imginfo {
+    display: block;
+}
+.thumbrun .imginfo span {
+    display: block;
+}
