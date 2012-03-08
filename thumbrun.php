@@ -21,13 +21,18 @@
  *      and upload.php
  */
 
-$RecipeInfo['Thumbrun']['Version'] = '2012-02-21';
+$RecipeInfo['Thumbrun']['Version'] = '2012-03-08';
+
+if ( !IsEnabled($EnableUpload,0) ) return;
 
 SDVA($Thumbrun, array(
   'ImgRx' => "/\\.(gif|png|jpe|jpe?g|wbmp|xbm|eps|svg)$/i",
-  'ThumbRx' => "/^thumb_/",
+  'ThumbPrefix' => 'thumb_',
   'Px' => 128,
   'ThumbBg' => 'grey',
+  'ShowUpload' => 0,
+  'ShowRename' => 0,
+  'ShowDelete' => 0,
 ));
 
 Markup('thumbrun', 'directives', 
@@ -36,7 +41,7 @@ Markup('thumbrun', 'directives',
 
 function ThumbrunList($pagename, $args) {
     global $UploadDir, $UploadPrefixFmt, $UploadUrlFmt, 
-           $TimeFmt, $EnableDirectDownload, $Thumbrun;
+           $EnableDirectDownload, $Thumbrun;
 
     // see if we can find ImageMagick
     $sout = shell_exec('convert -version');
@@ -62,43 +67,75 @@ function ThumbrunList($pagename, $args) {
     $dirp = @opendir($uploaddir);
     if (!$dirp) return '';
     $filelist = array();
+    $thumb_re = '/^' . $Thumbrun['ThumbPrefix'] . '/';
     while (($file=readdir($dirp)) !== false) {
         if ($file{0} == '.') continue;
-        if (@$filter && !preg_match(@$filter, $file)) continue;
+        if (@$filter && !preg_match($filter, $file)) continue;
         // match images
-        if (@$Thumbrun['ImgRx'] && !preg_match(@$Thumbrun['ImgRx'], $file)) continue;
+        if (@$Thumbrun['ImgRx'] && !preg_match($Thumbrun['ImgRx'], $file)) continue;
         // but skip thumbnails
-        if (@$Thumbrun['ThumbRx'] && preg_match(@$Thumbrun['ThumbRx'], $file)) continue;
+        if (@$Thumbrun['ThumbPrefix'] && preg_match($thumb_re, $file)) continue;
         $filelist[$file] = $file;
     }
     closedir($dirp);
     $out = array();
     natcasesort($filelist);
     foreach($filelist as $file=>$x) {
-        $out[] = ThumbrunListFile($pagename, $file, $uploadurl, $uploaddir,
+        $out[] = ThumbrunListItem($pagename, $file, $uploadurl, $uploaddir,
         ($opt['px'] ? $opt['px'] : $Thumbrun['Px']));
     }
     return implode("\n",$out);
 } # ThumbrunList
 
-function ThumbrunListFile($pagename, $file, $uploadurl, $uploaddir,$px) {
+function ThumbrunListItem($pagename, $file, $uploadurl, $uploaddir,$px) {
     global $TimeFmt, $Thumbrun;
 
     $link = PUE("$uploadurl$file");
     $stat = stat("$uploaddir/$file");
     $pinfo = pathinfo($file);
     $bn =  basename($file,'.'.$pinfo['extension']);
-    $thumbfile = "thumb_${bn}.png";
+    $thumbfile = $Thumbrun['ThumbPrefix'] . ${bn} . ".png";
     $thumblink = PUE("$uploadurl$thumbfile");
     ThumbrunMakeThumb($uploaddir,$file,$thumbfile,$px,$px);
-    $imginfo = "<span>$file</span> "
+    $imginfo = "<span><a href='$link'>$file</a></span> "
         . "<span>" . number_format($stat['size']) . " bytes</span> "
         . "<span>" . strftime($TimeFmt, $stat['mtime']) . "</span>";
-    $linkfmt = "<li><span class='item'><a href='%s'><img src='%s' alt='%s' title='%s'/></a> <span class='imginfo'>%s</span></span></li>";
-    $out = sprintf($linkfmt, $link, $thumblink, $file, $file, $imginfo);
+    $linkfmt = "<li><span class='item'><a href='%s'><img src='%s' alt='%s' title='%s'/></a> <span class='imginfo'>%s</span><span class='imgupdate'>%s</span></span></li>";
+    $update = ThumbrunListItemUpdate($pagename, $file);
+    $out = sprintf($linkfmt, $link, $thumblink, $file, $file, $imginfo, $update);
 
     return $out;
-} # ThumbrunListFile
+} # ThumbrunListItem
+
+function ThumbrunListItemUpdate($pagename, $file) {
+    global $EnableUploadOverwrite, $Thumbrun;
+
+    $overwrite = '';
+    if ($EnableUploadOverwrite && $Thumbrun['ShowUpload']) 
+    {
+        $overwrite = FmtPageName(
+            "<a rel='nofollow' class='createlink'
+            href='\$PageUrl?action=upload&amp;upname=$file'>&nbsp;&Delta;</a>", 
+            $pagename);
+    }
+    $rename = '';
+    if ($Thumbrun['ShowRename'])
+    {
+        $rename = FmtPageName(
+            "<a rel='nofollow' class='createlink'
+            href='\$PageUrl?action=renameattach&amp;upname=$file'>&nbsp;R</a>", 
+            $pagename);
+    }
+    $delete = '';
+    if ($Thumbrun['ShowDelete'])
+    {
+        $delete = FmtPageName(
+            "<a rel='nofollow' class='createlink'
+            href='\$PageUrl?action=delattach&amp;upname=$file'>&nbsp;X</a>", 
+            $pagename);
+    }
+    return "$overwrite $rename $delete";
+} # ThumbrunListItemUpdate
 
 function ThumbrunMakeThumb($uploaddir,$file,$thumbfile,$w,$h) {
     global $Thumbrun;

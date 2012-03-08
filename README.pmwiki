@@ -45,10 +45,12 @@ The following configuration variables can be set:
 
 ||'''Name'''||'''Description'''||'''Default'''||
 ||$Thumbrun['ImgRx']||Regular expresion to define what attachments are treated as images.||/\\.(gif|png|jpe|jpe?g|wbmp|xbm|eps|svg)$/i||
-||$Thumbrun['Px']||Default size of thumbnails.||128||
+||$Thumbrun['Px']||Default size (NxN) of thumbnails.||128||
 ||$Thumbrun['ThumbBg']||Default background colour of thumbnail images.||grey||
-
-
+||$Thumbrun['ThumbPrefix']||Prefix for the name of thumbnail images.||thumb_||
+||$Thumbrun['ShowUpload']||Show a re-upload link.||false||
+||$Thumbrun['ShowRename']||Show a rename attachment link.||false||
+||$Thumbrun['ShowDelete']||Show a delete attachment link.||false||
 
 !!Styling the thumbnail list
 
