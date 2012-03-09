@@ -27,6 +27,7 @@ if ( !IsEnabled($EnableUpload,0) ) return;
 
 SDVA($Thumbrun, array(
   'ImgRx' => "/\\.(gif|png|jpe|jpe?g|wbmp|xbm|eps|svg)$/i",
+  'ThumbDir' => '',
   'ThumbPrefix' => 'thumb_',
   'Px' => 128,
   'ThumbBg' => 'grey',
@@ -67,7 +68,7 @@ function ThumbrunList($pagename, $args) {
     $dirp = @opendir($uploaddir);
     if (!$dirp) return '';
     $filelist = array();
-    $thumb_re = '/^' . $Thumbrun['ThumbPrefix'] . '/';
+    $thumb_re = '/^' . preg_quote($Thumbrun['ThumbPrefix'], '/') . '/';
     while (($file=readdir($dirp)) !== false) {
         if ($file{0} == '.') continue;
         if (@$filter && !preg_match($filter, $file)) continue;
@@ -90,12 +91,27 @@ function ThumbrunList($pagename, $args) {
 function ThumbrunListItem($pagename, $file, $uploadurl, $uploaddir,$px) {
     global $TimeFmt, $Thumbrun;
 
-    $link = PUE("$uploadurl$file");
-    $stat = stat("$uploaddir/$file");
     $pinfo = pathinfo($file);
     $bn =  basename($file,'.'.$pinfo['extension']);
     $thumbfile = $Thumbrun['ThumbPrefix'] . ${bn} . ".png";
-    $thumblink = PUE("$uploadurl$thumbfile");
+
+    $thumblink='';
+    if ($Thumbrun['ThumbDir'])
+    {
+        $thumbdir = $Thumbrun['ThumbDir'];
+        $fulldir = "$uploaddir/$thumbdir";
+        if (!is_dir($fulldir))
+        {
+            mkdir($fulldir);
+        }
+        $thumblink = PUE("$uploadurl/$thumbdir/$thumbfile");
+    }
+    else
+    {
+        $thumblink = PUE("$uploadurl$thumbfile");
+    }
+    $link = PUE("$uploadurl/$file");
+    $stat = stat("$uploaddir/$file");
     ThumbrunMakeThumb($uploaddir,$file,$thumbfile,$px,$px);
     $imginfo = "<span><a href='$link'>$file</a></span> "
         . "<span>" . number_format($stat['size']) . " bytes</span> "
@@ -142,6 +158,10 @@ function ThumbrunMakeThumb($uploaddir,$file,$thumbfile,$w,$h) {
 
     $filepath = "$uploaddir/$file";
     $thumbpath = "$uploaddir/$thumbfile";
+    if (@$Thumbrun['ThumbDir'])
+    {
+        $thumbpath = $uploaddir . '/' . $Thumbrun['ThumbDir'] . '/' . $thumbfile;
+    }
     if (file_exists($thumbpath) || !file_exists($filepath))
     {
         return;
