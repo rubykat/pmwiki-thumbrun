@@ -38,7 +38,7 @@ SDVA($Thumbrun, array(
 
 Markup('thumbrun', 'directives', 
   '/\\(:thumbrun\\s*(.*?):\\)/ei',
-  "Keep('<ul class=thumbrun>'.ThumbrunList('$pagename',PSS('$1')).'</ul>')");
+  "Keep(ThumbrunList('$pagename',PSS('$1')))");
 
 function ThumbrunList($pagename, $args) {
     global $UploadDir, $UploadPrefixFmt, $UploadUrlFmt, 
@@ -59,6 +59,17 @@ function ThumbrunList($pagename, $args) {
 	$filter = $opt['filter'];
     }
 
+    $start = 1;
+    if (@$opt['start'])
+    {
+	$start = $opt['start'];
+    }
+    $max = 0;
+    if (@$opt['max'])
+    {
+	$max = $opt['max'];
+    }
+
     $uploaddir = FmtPageName("$UploadDir$UploadPrefixFmt", $pagename);
     $uploadurl = FmtPageName(IsEnabled($EnableDirectDownload, 1) 
                              ? "$UploadUrlFmt$UploadPrefixFmt/"
@@ -69,7 +80,9 @@ function ThumbrunList($pagename, $args) {
     if (!$dirp) return '';
     $filelist = array();
     $thumb_re = '/^' . preg_quote($Thumbrun['ThumbPrefix'], '/') . '/';
-    while (($file=readdir($dirp)) !== false) {
+    while (($file=readdir($dirp)) !== false)
+        
+    {
         if ($file{0} == '.') continue;
         if (@$filter && !preg_match($filter, $file)) continue;
         // match images
@@ -81,14 +94,32 @@ function ThumbrunList($pagename, $args) {
     closedir($dirp);
     $out = array();
     natcasesort($filelist);
-    foreach($filelist as $file=>$x) {
-        $out[] = ThumbrunListItem($pagename, $file, $uploadurl, $uploaddir,
-        ($opt['px'] ? $opt['px'] : $Thumbrun['Px']));
+    $count = 0;
+    $showing_count = 0;
+    foreach($filelist as $file=>$x)
+    {
+        $count++;
+        if ($count >= $start
+            and (($count < ($start + $max)) or ($max == 0)))
+        {
+            $out[] = ThumbrunListItem(
+                $pagename, $file, $uploadurl, $uploaddir,
+                ($opt['px'] ? $opt['px'] : $Thumbrun['Px']));
+            $showing_count++;
+        }
     }
-    return implode("\n",$out);
+    $showing_info = (($showing_count < $count)
+                     ? ($start > 1
+                        ? "<p>Showing $showing_count images out of $count, starting at $start.</p>\n"
+                        : "<p>Showing $showing_count images out of $count.</p>\n")
+                     : "<p>Showing $showing_count images.</p>");
+    return $showing_info
+        . '<ul class="thumbrun">'
+        . implode("\n",$out)
+        . "</ul>\n";
 } # ThumbrunList
 
-function ThumbrunListItem($pagename, $file, $uploadurl, $uploaddir,$px) {
+function ThumbrunListItem($pagename, $file, $uploadurl, $uploaddir, $px) {
     global $TimeFmt, $Thumbrun;
 
     $pinfo = pathinfo($file);
@@ -112,10 +143,17 @@ function ThumbrunListItem($pagename, $file, $uploadurl, $uploaddir,$px) {
     }
     $link = PUE("$uploadurl/$file");
     $stat = stat("$uploaddir/$file");
-    ThumbrunMakeThumb($uploaddir,$file,$thumbfile,$px,$px);
     $imginfo = "<span><a href='$link'>$file</a></span> "
-        . "<span>" . number_format($stat['size']) . " bytes</span> "
-        . "<span>" . strftime($TimeFmt, $stat['mtime']) . "</span>";
+        . "<span>" . number_format($stat['size']) . " bytes</span> ";
+    $ident = shell_exec("identify $uploaddir/$file");
+    if (preg_match("/(\d+x\d+)/", $ident, $m))
+    {
+        $imginfo .= "<span>$m[1]</span> ";
+    }
+    $imginfo .= "<span>" . strftime($TimeFmt, $stat['mtime']) . "</span>";
+
+    ThumbrunMakeThumb($uploaddir,$file,$thumbfile,$px,$px);
+
     $linkfmt = "<li><span class='item'><a href='%s'><img src='%s' alt='%s' title='%s'/></a> <span class='imginfo'>%s</span><span class='imgupdate'>%s</span></span></li>";
     $update = ThumbrunListItemUpdate($pagename, $file);
     $out = sprintf($linkfmt, $link, $thumblink, $file, $file, $imginfo, $update);
